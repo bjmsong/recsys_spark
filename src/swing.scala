@@ -6,7 +6,6 @@ import org.apache.spark.sql.functions._
 import org.apache.spark.sql.expressions.Window
 import org.apache.log4j.{Level, Logger}
 
-
 object swing {
   def main(args: Array[String]): Unit = {
     Logger.getRootLogger.setLevel(Level.WARN)
@@ -58,16 +57,16 @@ object swing {
       val result = new ArrayBuffer[(Long, Long, Long)]()
       for (i <- 0 to itemlist.length - 2) {
         for (j <- i + 1 to itemlist.length - 1) {
-          result += ((itemlist(i), itemlist(j), 1)) // 热门user惩罚
+          result += ((itemlist(i), itemlist(j), 1)) // 没有加热门user惩罚
         }
       }
-      result // 将result展开,每一个元素一行
+      result // flatMap：将result展开,每一个商品组合一行
     }.withColumnRenamed("_1", "itemidI").withColumnRenamed("_2", "itemidJ").withColumnRenamed("_3", "score")
 
-    // 商品组合至少被两个人买过的,并且商品的组合已经排过序了
+    // 商品组合至少被两个人买过的（否则根本没有用户交集）,并且商品的组合已经排过序了
     val df_sales3 = df_sales2.groupBy("itemidI", "itemidJ").agg(sum("score").as("score")).filter($"score" >= 2)
 
-    // 商品的倒排表
+    // 商品的倒排表：物品->用户
     val df_item1 = df_sales.groupBy("itemid").agg(collect_set("userid").as("userid_set"))
 
     // 把商品的购买用户集合join进来，商品的组合也是排过序的

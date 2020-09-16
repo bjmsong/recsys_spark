@@ -58,7 +58,7 @@ object itemCF {
       val result = new ArrayBuffer[(Int, Int, Double)]()
       for (i <- 0 to itemlist.length - 2) {
         for (j <- i + 1 to itemlist.length - 1) {
-          result += ((itemlist(i), itemlist(j), 1.0 / math.log(1 + itemlist.length))) // 热门user惩罚
+          result += ((itemlist(i), itemlist(j), 1.0 / math.log(1 + itemlist.length))) // 活跃用户惩罚
         }
       }
       result
@@ -69,12 +69,12 @@ object itemCF {
     // 计算商品的购买次数
     val df_sales0 = df_sales.withColumn("score", lit(1)).groupBy("itemid").agg(sum("score").as("score"))
 
-    // 计算共现相似度,N ∩ M / srqt(N * M), row_number取top top_similar_item_num
+    // 计算商品相似度： N ∩ M / srqt(N * M), 取相似度topN
     val df_sales4 = df_sales3.join(df_sales0.withColumnRenamed("itemid", "itemidJ").withColumnRenamed("score", "sumJ").select("itemidJ", "sumJ"), "itemidJ")
     val df_sales5 = df_sales4.join(df_sales0.withColumnRenamed("itemid", "itemidI").withColumnRenamed("score", "sumI").select("itemidI", "sumI"), "itemidI")
     val df_sales6 = df_sales5.withColumn("result", bround(col("sumIJ") / sqrt(col("sumI") * col("sumJ")), 5)).withColumn("rank", row_number().over(Window.partitionBy("itemidI").orderBy($"result".desc))).filter(s"rank <= ${similar_item_num}").drop("rank")
 
-    // itme1和item2交换
+    // 得到商品的相似商品列表：itme,similar_items(item,similarity)
     val df_sales8 = df_sales6.select("itemidI", "itemidJ", "sumJ", "result").union(df_sales6.select($"itemidJ".as("itemidI"), $"itemidI".as("itemidJ"), $"sumI".as("sumJ"), $"result")).withColumnRenamed("result", "similar").cache()
     val itemcf_similar = df_sales8.map { row =>
       val itemidI = row.getInt(0)
@@ -82,7 +82,7 @@ object itemCF {
       (itemidI, itemidJ_similar)
     }.toDF("itemid", "similar_items").groupBy("itemid").agg(collect_list("similar_items").as("similar_items"))
 
-    // 计算用户偏好
+    // 通过用户购买历史计算用户偏好：随时间衰减
     val score = df_sales.withColumn("pref", lit(1) / (datediff(current_date(), $"date") * profile_decay + 1)).groupBy("userid", "itemid").agg(sum("pref").as("pref"))
 
     // 连接用户偏好，商品相似度
