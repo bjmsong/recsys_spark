@@ -108,7 +108,7 @@ object swing {
     // join
     val df_join5 = df_join4.join(df_item3, Seq("useridI", "useridJ"), "left_outer")
 
-    // 最后一步计算,分母平滑因子取了1
+    // 最后一步:计算相似度,分母平滑因子取了1
     val df_join6 = df_join5.withColumn("similar", lit(1) / (lit(1) + $"user_pair_score")).select("itemidI", "itemidJ", "similar").withColumn("rank", row_number().over(Window.partitionBy("itemidI").orderBy($"similar".desc))).filter(s"rank <= ${similar_item_num}").drop("rank")
 
     // 再union一下
@@ -123,7 +123,7 @@ object swing {
     // 用户的偏好
     val score = df_sales.withColumn("pref", lit(1) / (datediff(current_date(), $"date") * profile_decay + 1)).groupBy("userid", "itemid").agg(sum("pref").as("pref"))
 
-    // 内连接，会连接所有可能
+    // 内连接，会连接所有可能 ：极耗内存
     val df_user_prefer1 = df_join8.join(score, $"itemidI" === $"itemid", "inner")
 
     // 偏好 × 相似度 × 商品热度降权

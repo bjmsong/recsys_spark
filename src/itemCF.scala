@@ -69,7 +69,7 @@ object itemCF {
     // 计算商品的购买次数
     val df_sales0 = df_sales.withColumn("score", lit(1)).groupBy("itemid").agg(sum("score").as("score"))
 
-    // 计算商品相似度： N ∩ M / srqt(N * M), 取相似度topN
+    // 计算商品相似度： N ∩ M / srqt(N * M), 取topN
     val df_sales4 = df_sales3.join(df_sales0.withColumnRenamed("itemid", "itemidJ").withColumnRenamed("score", "sumJ").select("itemidJ", "sumJ"), "itemidJ")
     val df_sales5 = df_sales4.join(df_sales0.withColumnRenamed("itemid", "itemidI").withColumnRenamed("score", "sumI").select("itemidI", "sumI"), "itemidI")
     val df_sales6 = df_sales5.withColumn("result", bround(col("sumIJ") / sqrt(col("sumI") * col("sumJ")), 5)).withColumn("rank", row_number().over(Window.partitionBy("itemidI").orderBy($"result".desc))).filter(s"rank <= ${similar_item_num}").drop("rank")
